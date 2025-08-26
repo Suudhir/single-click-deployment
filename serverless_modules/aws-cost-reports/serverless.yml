@@ -1,0 +1,72 @@
+service: aws-cost-reports
+
+provider:
+  name: aws
+  runtime: python3.8
+  stage: default
+  env: ${opt:env, 'dev'}
+  region: ${opt:region, 'eu-west-1'}
+  deploymentBucket:
+    name: testing-lambda-artifacts-dev
+    maxPreviousDeploymentArtifacts: 10
+    blockPublicAccess: true
+
+  iamRoleStatements:
+    - ${file(./iam/cloud_watch_logs.yaml)}
+    - ${file(./iam/ec2_permissions.yaml)}
+    - Effect: "Allow"
+      Action:
+        - "ce:GetCostAndUsage"
+      Resource: "*"
+    # Needed to get account alias
+    - Effect: "Allow"
+      Action:
+        - "iam:ListAccountAliases"
+      Resource: "*"
+    - Effect: Allow
+      Action:
+        - lambda:InvokeFunction
+      Resource: "*"
+
+plugins:
+  - serverless-python-requirements
+  - serverless-pseudo-parameters
+  - serverless-vpc-discovery
+
+package:
+   include:
+     - handler.py
+   exclude:
+     - tests/**
+     - env/**
+     - node_modules/**
+
+functions:
+  report_cost:
+    name: ${opt:function_name, 'aws-cost-reports'}
+    handler: handler.lambda_handler
+    description: This Lambda sends regular cost reports of this account on designated slack channel.
+    memorySize: ${file(./configs/config.${self:provider.env}.yaml):lambda_config.memorySize}
+    timeout: ${file(./configs/config.${self:provider.env}.yaml):lambda_config.timeout}
+    environment: ${file(./configs/config.${self:provider.env}.yaml):variables}
+    tags: ${file(./configs/config.${self:provider.env}.yaml):tags}
+    events:
+      # Every Monday at 16:00 IST / 10:30 GMT
+      - schedule:
+          rate: cron(0 10 * * ? *)
+          inputTransformer:
+            inputTemplate: '{"time": "Daily"}'
+            
+      - schedule:
+          rate: cron(30 10 ? * 2 *)
+          inputTransformer:
+            inputTemplate: '{"time": "Weekly"}'
+
+
+
+custom:
+  pythonRequirements:
+    dockerizePip: false
+    useDownloadCache: false
+    useStaticCache: false
+  vpcDiscovery: ${file(./configs/config.${self:provider.env}.yaml):vpcDiscovery}

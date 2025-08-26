@@ -1,0 +1,24 @@
+variables:
+  ACCOUNT_NAME: SUDHIR DEV
+  SLACK_WEBHOOK_URL: https://domain-name.webhook.office.com/webhookb2/e44de94f-f697-4773-b9c7-d46705402640@7ff914bc-ca07-4c28-8277-73e20a4966c7/IncomingWebhook/0e66784a4b18426895c3176ac0e38003/c946e986-1c9b-4cbe-bf47-4eef066f485a
+
+
+vpcDiscovery:
+  vpcName: dev
+  subnetNames:
+    - dev-private-eu-west-1a
+    - dev-private-eu-west-1c
+  securityGroupNames:
+    - dev internal_all_open
+
+lambda_config:
+  timeout: 10
+  memorySize: 128
+
+tags:
+  Name: aws-cost-reports
+  Environment: dev
+  Product:    testing
+  Service:    lambda
+  Serverless: true
+  Contact:    sudhirsinghrathore78612@gmail.com

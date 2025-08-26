@@ -1,0 +1,119 @@
+image: atlassian/default-image:3
+
+definitions: 
+  steps:
+    - step: &Deployment #terraform deployment step
+        name: Terraform-Deployment
+        image: hashicorp/terraform
+        script:
+           - |
+              if [ $deploy_env == "dev" ]; then
+                export AWS_SECRET_ACCESS_KEY=$DEV_AWS_SECRET_ACCESS_KEY
+                export AWS_ACCESS_KEY_ID=$DEV_AWS_ACCESS_KEY_ID
+              elif [ $deploy_env == "stage" ]; then
+                export AWS_SECRET_ACCESS_KEY=$STAGE_AWS_SECRET_ACCESS_KEY
+                export AWS_ACCESS_KEY_ID=$STAGE_AWS_ACCESS_KEY_ID
+              elif [ $deploy_env == "prod" ]; then
+                export AWS_SECRET_ACCESS_KEY=$PROD_AWS_SECRET_ACCESS_KEY
+                export AWS_ACCESS_KEY_ID=$PROD_AWS_ACCESS_KEY_ID
+              else
+                echo "Invalid credentials"
+              fi
+           - sh scripts/terraform_deployment.sh $action $BITBUCKET_BRANCH $deploy_env
+
+
+    - step: &Serverless #lambda deployment step
+        name: Lambda-Deployment
+        image: atlassian/default-image:3
+        script:
+           - |
+              if [ $deploy_env == "dev" ]; then
+                export AWS_SECRET_ACCESS_KEY=$DEV_AWS_SECRET_ACCESS_KEY
+                export AWS_ACCESS_KEY_ID=$DEV_AWS_ACCESS_KEY_ID
+              elif [ $deploy_env == "stage" ]; then
+                export AWS_SECRET_ACCESS_KEY=$STAGE_AWS_SECRET_ACCESS_KEY
+                export AWS_ACCESS_KEY_ID=$STAGE_AWS_ACCESS_KEY_ID
+              elif [ $deploy_env == "prod" ]; then
+                export AWS_SECRET_ACCESS_KEY=$PROD_AWS_SECRET_ACCESS_KEY
+                export AWS_ACCESS_KEY_ID=$PROD_AWS_ACCESS_KEY_ID
+              else
+                echo "Invalid credentials"
+              fi
+           - sh scripts/serverless_deployment.sh $action $BITBUCKET_BRANCH $deploy_env $version_enabled           
+          
+    - step: &Testing
+        name: "Checkov-testing"
+        image: bridgecrew/checkov # tool checkov's docker image is been used in this step
+        script:
+          - |   
+              if [ $testing == true ]; then
+              ls
+              cd terraform_modules/ 
+              folders=$(find . -maxdepth 1 -type d ! -name '*tfvars')
+              for folder in $folders
+               do
+                  if [[ $folder != "." && $folder != ".." && ! -f "$folder/$(basename "$folder").tfvars" ]]; then
+                       echo "Folder without tfvars file found: $(basename "$folder" | sed 's/^\.\///')"
+                       checkov -d $(basename "$folder" | sed 's/^\.\///')
+                       echo "checkov-testing-done" 
+                       cd ..
+                       echo "Changed back to the original directory"
+                   fi
+               done
+               else
+                 echo "testing-skipped"
+              fi
+    # - step: &Doc
+    #     name: "Terraform-doc
+    #     script:
+    #       - apt-get update && apt-get install -y curl
+    #       - curl -L -o /usr/local/bin/terraform-docs https://github.com/terraform-docs/terraform-docs/releases/download/v0.15.0/terraform-docs-v0.15.0-$(uname -s)-$(uname -m)
+    #       - chmod +x /usr/local/bin/terraform-docs
+    #       - terraform-docs --version 
+    #       - terraform-docs markdown
+
+
+
+
+      
+pipelines: 
+  custom: 
+    deployment:
+      - variables: 
+          - name: deploy_env
+            default: "choose an environment"
+            allowed-values:
+              - "dev"
+              - "stage"
+              - "prod"
+              - "choose an environment"
+          - name: action 
+            default: "choose an action"
+            allowed-values:
+              - "choose an action"
+              - "Plan"
+              - "Apply"
+              - "Destroy"
+          - name: testing
+            default: "false"
+            allowed-values:
+              - "true"
+              - "false"  
+          - name: version_enabled
+            default: "choose for lambda version"
+            allowed-values:
+              - "true"
+              - "false"
+              - "choose for lambda version"                  
+
+      # - step: 
+      #     <<: *Testing  # pointing to checkov-testing step
+
+      # - step: 
+      #     <<: *Deployment # pointing to terraform deployment step
+
+      - step: 
+          <<: *Serverless # pointing to lambda deployment step
+
+      # - step: 
+      #     <<: *Doc      

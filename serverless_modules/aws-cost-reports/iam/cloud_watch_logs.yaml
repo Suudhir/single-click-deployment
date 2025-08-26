@@ -1,0 +1,4 @@
+Action:
+  - logs:*
+Effect: Allow
+Resource: arn:aws:events:${self:provider.region}:#{AWS::AccountId}:rule/*

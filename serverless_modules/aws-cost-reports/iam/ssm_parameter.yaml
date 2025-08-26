@@ -1,0 +1,11 @@
+Effect: "Allow"
+Action:
+  - "ssm:PutParameter"
+  - "ssm:DeleteParameter"
+  - "ssm:GetParameterHistory"
+  - "ssm:GetParametersByPath"
+  - "ssm:GetParameters"
+  - "ssm:GetParameter"
+  - "ssm:DeleteParameters"
+  - "ssm:DescribeParameters"
+Resource: "*"
